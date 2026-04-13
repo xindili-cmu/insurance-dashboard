@@ -467,8 +467,11 @@ function renderCharts(d) {
   });
 }
 
+// Safe DOM setter — skips if element doesn't exist (e.g. replaced by loading spinner)
+const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
 function updateKPIs(d) {
-  const total = d.total;
+  const total = d.total || 1;
   const enrolled = d.statusCounts.Enrolled || 0;
   const connecting = d.statusCounts.Connecting || 0;
   const noResponse = d.statusCounts['No Response'] || 0;
@@ -477,34 +480,30 @@ function updateKPIs(d) {
   const fuEnrolled = d.followups.Enrolled || 0;
   const fuNoResp = d.followups['No Response'] || 0;
   const gc = d.groupChat;
-  const inGroupRate = gc.inGroup.enrolled / (gc.inGroup.enrolled + gc.inGroup.notEnrolled) * 100;
-  const notGroupRate = gc.notInGroup.enrolled / (gc.notInGroup.enrolled + gc.notInGroup.notEnrolled) * 100;
+  const inTotal = gc.inGroup.enrolled + gc.inGroup.notEnrolled || 1;
+  const outTotal = gc.notInGroup.enrolled + gc.notInGroup.notEnrolled || 1;
+  const inGroupRate = gc.inGroup.enrolled / inTotal * 100;
+  const notGroupRate = gc.notInGroup.enrolled / outTotal * 100;
 
-  document.getElementById('kpi-total').textContent = total;
-  document.getElementById('kpi-period').textContent = d.period;
-  document.getElementById('kpi-enrolled').textContent = enrolled;
-  document.getElementById('kpi-enroll-rate').textContent = `${(enrolled/total*100).toFixed(1)}% rate`;
-  document.getElementById('kpi-connecting').textContent = connecting;
-  document.getElementById('kpi-atrisk').textContent = atRisk;
-  document.getElementById('kpi-followup').textContent = fuEnrolled.toFixed(1);
-  document.getElementById('kpi-followup-sub').textContent = `vs ${fuNoResp.toFixed(1)} for No Response`;
-  document.getElementById('header-count').textContent = total;
-  document.getElementById('header-period').textContent = d.period;
-  document.getElementById('footer-note').textContent = `Data period: ${d.period} · ${total} leads analyzed`;
-
-  // Status stat rows
-  document.getElementById('sr-enrolled').textContent = `${enrolled} (${(enrolled/total*100).toFixed(1)}%)`;
-  document.getElementById('sr-noresponse').textContent = `${noResponse} (${(noResponse/total*100).toFixed(1)}%)`;
-  document.getElementById('sr-connecting').textContent = `${connecting} (${(connecting/total*100).toFixed(1)}%)`;
-  document.getElementById('sr-lost').textContent = `${lost} (${(lost/total*100).toFixed(1)}%)`;
-
-  // Opp numbers
-  document.getElementById('opp-groupchat').textContent = `+${gc.notInGroup.notEnrolled}`;
-  document.getElementById('opp-noresponse').textContent = noResponse;
-  document.getElementById('opp-expired').textContent = (d.statusCounts.Expired||0) + (d.statusCounts.Lost||0) + (d.statusCounts.Canceled||0);
-
-  // Group highlight
-  document.getElementById('exec-group-highlight').textContent = `${inGroupRate.toFixed(1)}% vs ${notGroupRate.toFixed(1)}%`;
+  set('kpi-total', total);
+  set('kpi-period', d.period);
+  set('kpi-enrolled', enrolled);
+  set('kpi-enroll-rate', `${(enrolled/total*100).toFixed(1)}% rate`);
+  set('kpi-connecting', connecting);
+  set('kpi-atrisk', atRisk);
+  set('kpi-followup', fuEnrolled.toFixed(1));
+  set('kpi-followup-sub', `vs ${fuNoResp.toFixed(1)} for No Response`);
+  set('header-count', total);
+  set('header-period', d.period);
+  set('footer-note', `Data period: ${d.period} · ${total} leads analyzed`);
+  set('sr-enrolled', `${enrolled} (${(enrolled/total*100).toFixed(1)}%)`);
+  set('sr-noresponse', `${noResponse} (${(noResponse/total*100).toFixed(1)}%)`);
+  set('sr-connecting', `${connecting} (${(connecting/total*100).toFixed(1)}%)`);
+  set('sr-lost', `${lost} (${(lost/total*100).toFixed(1)}%)`);
+  set('opp-groupchat', `+${gc.notInGroup.notEnrolled}`);
+  set('opp-noresponse', noResponse);
+  set('opp-expired', (d.statusCounts.Expired||0) + (d.statusCounts.Lost||0) + (d.statusCounts.Canceled||0));
+  set('exec-group-highlight', `${inGroupRate.toFixed(1)}% vs ${notGroupRate.toFixed(1)}%`);
 }
 
 // ── Claude API: generate insights ──
@@ -515,11 +514,14 @@ async function generateAIInsights(d) {
   const gc = d.groupChat;
   const inGroupRate = (gc.inGroup.enrolled / (gc.inGroup.enrolled + gc.inGroup.notEnrolled) * 100).toFixed(1);
   const notGroupRate = (gc.notInGroup.enrolled / (gc.notInGroup.enrolled + gc.notInGroup.notEnrolled) * 100).toFixed(1);
-  const topCat = Object.entries(d.categories).sort((a,b)=>(b[1].enrolled/b[1].total)-(a[1].enrolled/a[1].total))[0];
-  const bottomCat = Object.entries(d.categories).sort((a,b)=>(a[1].enrolled/a[1].total)-(b[1].enrolled/b[1].total))[0];
-  const topAgent = Object.entries(d.agents).sort((a,b)=>(b[1].enrolled/(b[1].enrolled+b[1].notEnrolled))-(a[1].enrolled/(a[1].enrolled+a[1].notEnrolled)))[0];
-  const topPolicy = Object.entries(d.policies).sort((a,b)=>b[1]-a[1])[0];
-  const peakMonth = d.monthly.labels[d.monthly.data.indexOf(Math.max(...d.monthly.data))];
+  const catEntries = Object.entries(d.categories).filter(([,v]) => v.total > 0);
+  const topCat = [...catEntries].sort((a,b)=>(b[1].enrolled/b[1].total)-(a[1].enrolled/a[1].total))[0] || ['N/A', {enrolled:0,total:1}];
+  const bottomCat = [...catEntries].sort((a,b)=>(a[1].enrolled/a[1].total)-(b[1].enrolled/b[1].total))[0] || ['N/A', {enrolled:0,total:1}];
+  const agentEntries = Object.entries(d.agents).filter(([,v]) => (v.enrolled+v.notEnrolled) > 0);
+  const topAgent = agentEntries.sort((a,b)=>(b[1].enrolled/(b[1].enrolled+b[1].notEnrolled))-(a[1].enrolled/(a[1].enrolled+a[1].notEnrolled)))[0] || ['N/A', {enrolled:0,notEnrolled:1}];
+  const topPolicy = Object.entries(d.policies).sort((a,b)=>b[1]-a[1])[0] || ['N/A', 0];
+  const monthData = d.monthly.data.length ? d.monthly.data : [0];
+  const peakMonth = d.monthly.labels[monthData.indexOf(Math.max(...monthData))] || 'Unknown';
 
   const statsPrompt = `You are a CRM analyst for Student Medicover, a health insurance company serving international students in the US. Analyze this lead pipeline data and write CONCISE insight text for each section of a dashboard. Use plain text only — no markdown, no asterisks, no bullet points. Be direct and data-specific.
 
@@ -758,15 +760,22 @@ document.getElementById('csv-input').addEventListener('change', function(e) {
   status.className = '';
   const reader = new FileReader();
   reader.onload = function(ev) {
+    let d;
     try {
-      const d = parseCSV(ev.target.result);
-      if (d.total === 0) throw new Error('No valid rows found.');
-      status.className = 'success';
-      status.textContent = `✓ ${file.name} loaded — ${d.total} leads · ${d.period}. Regenerating AI insights…`;
-      renderAll(d);
+      d = parseCSV(ev.target.result);
+      if (d.total === 0) throw new Error('No valid rows found — check your CSV has data rows.');
     } catch(err) {
       status.className = 'error';
-      status.textContent = `✗ Error parsing CSV: ${err.message}. Check column names match expected format.`;
+      status.textContent = `✗ CSV parse error: ${err.message}`;
+      return;
+    }
+    status.className = 'success';
+    status.textContent = `✓ ${file.name} loaded — ${d.total} leads · ${d.period}. Regenerating AI insights…`;
+    try {
+      renderAll(d);
+    } catch(err) {
+      console.error('Render error:', err);
+      status.textContent += ` (render warning: ${err.message})`;
     }
   };
   reader.readAsText(file);
