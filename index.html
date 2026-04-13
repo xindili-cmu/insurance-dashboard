@@ -573,16 +573,22 @@ Respond ONLY with a valid JSON object with these exact keys:
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-3-5-haiku-20241022",
         max_tokens: 1000,
         messages: [{ role: "user", content: statsPrompt }]
       })
     });
 
     const result = await response.json();
+    if (!response.ok || result.error) {
+      throw new Error(`API error ${response.status}: ${result.error?.message || JSON.stringify(result)}`);
+    }
     const text = result.content?.map(b => b.text || '').join('');
+    if (!text) throw new Error('Empty response from API');
     const clean = text.replace(/```json|```/g, '').trim();
-    const ai = JSON.parse(clean);
+    let ai;
+    try { ai = JSON.parse(clean); }
+    catch(e) { throw new Error('JSON parse failed: ' + text.slice(0,200)); }
 
     // Restore exec grid
     document.getElementById('exec-content').innerHTML = `
@@ -624,13 +630,16 @@ Respond ONLY with a valid JSON object with these exact keys:
 
   } catch (err) {
     console.error('Claude API error:', err);
+    const errMsg = err.message || String(err);
     insightIds.forEach(id => {
       const el = document.getElementById(id);
-      el.className = 'insight-strip';
-      el.innerHTML = `<strong>Note:</strong> AI insights unavailable. Check console for details.`;
+      if (el) {
+        el.className = 'insight-strip';
+        el.innerHTML = `<strong>Error:</strong> ${errMsg}`;
+      }
     });
-    // Restore exec with static content
-    document.getElementById('exec-content').innerHTML = `<p style="color:#aaa;font-size:0.82rem;">AI summary unavailable — check API connection.</p>`;
+    const execEl = document.getElementById('exec-content');
+    if (execEl) execEl.innerHTML = `<p style="color:#f88;font-size:0.82rem;">AI error: ${errMsg}</p>`;
   }
 }
 
