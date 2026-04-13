@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Medicover — Lead Pipeline Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --red: #C0392B;
+    --red-light: #E74C3C;
+    --red-pale: #FDF0EF;
+    --dark: #1A1A1A;
+    --mid: #555;
+    --muted: #888;
+    --border: #E8E8E8;
+    --bg: #F7F5F3;
+    --white: #FFFFFF;
+    --green: #27AE60;
+    --amber: #E67E22;
+    --blue: #2980B9;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--dark); line-height: 1.5; }
+
+  /* ── Header ── */
+  header {
+    background: var(--dark); color: white;
+    padding: 28px 48px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-icon { width: 40px; height: 40px; background: var(--red); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .brand-text h1 { font-family: 'DM Serif Display', serif; font-size: 1.35rem; letter-spacing: 0.02em; }
+  .brand-text p { font-size: 0.78rem; color: #aaa; font-weight: 300; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  .header-meta { text-align: right; font-size: 0.78rem; color: #aaa; }
+  .header-meta strong { color: white; font-size: 0.85rem; }
+
+  /* ── Upload Zone ── */
+  #upload-zone {
+    background: var(--dark);
+    border-top: 1px solid #333;
+    padding: 16px 48px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  #upload-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--red);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+  #upload-label:hover { background: var(--red-light); }
+  #csv-input { display: none; }
+  #upload-status {
+    font-size: 0.78rem;
+    color: #aaa;
+    flex: 1;
+  }
+  #upload-status.success { color: #2ecc71; }
+  #upload-status.error { color: var(--red-light); }
+  .csv-hint {
+    font-size: 0.72rem;
+    color: #555;
+    line-height: 1.5;
+  }
+  .csv-hint strong { color: #999; }
+
+  /* ── Layout ── */
+  .wrapper { max-width: 1320px; margin: 0 auto; padding: 36px 48px 60px; }
+
+  .section-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  /* ── KPI Row ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 36px; }
+  .kpi-card { background: var(--white); border-radius: 12px; padding: 22px 20px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--red); }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.amber::before { background: var(--amber); }
+  .kpi-card.blue::before { background: var(--blue); }
+  .kpi-card.purple::before { background: #8E44AD; }
+  .kpi-label { font-size: 0.72rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .kpi-value { font-family: 'DM Serif Display', serif; font-size: 2.4rem; line-height: 1.1; margin: 6px 0 4px; color: var(--dark); }
+  .kpi-sub { font-size: 0.75rem; color: var(--muted); }
+  .kpi-badge { display: inline-block; font-size: 0.68rem; font-weight: 600; padding: 2px 7px; border-radius: 20px; margin-top: 4px; }
+  .badge-green { background: #E8F8EF; color: var(--green); }
+  .badge-red { background: #FDEEEE; color: var(--red); }
+  .badge-amber { background: #FEF6EC; color: var(--amber); }
+
+  /* ── Charts ── */
+  .chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .chart-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .card { background: var(--white); border-radius: 12px; border: 1px solid var(--border); padding: 24px; }
+  .card-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mid); margin-bottom: 4px; }
+  .card-subtitle { font-size: 0.73rem; color: var(--muted); margin-bottom: 18px; }
+  .chart-container { position: relative; width: 100%; }
+  .chart-container canvas { display: block; }
+
+  /* ── Insight strip ── */
+  .insight-strip { background: var(--red-pale); border-left: 4px solid var(--red); border-radius: 0 8px 8px 0; padding: 12px 16px; font-size: 0.78rem; color: var(--dark); margin-top: 14px; }
+  .insight-strip strong { color: var(--red); }
+  .insight-strip.loading { background: #f5f5f5; border-left-color: #ccc; color: #999; font-style: italic; }
+  .insight-strip.ai { background: #f0f4ff; border-left-color: var(--blue); }
+  .insight-strip.ai strong { color: var(--blue); }
+
+  /* ── Stat rows ── */
+  .stat-rows { margin-top: 10px; }
+  .stat-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row-label { color: var(--mid); }
+  .stat-row-val { font-weight: 600; color: var(--dark); }
+  .bar-bg { flex: 1; height: 6px; background: var(--border); border-radius: 3px; margin: 0 12px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--red); border-radius: 3px; transition: width 0.8s ease; }
+  .bar-fill.green { background: var(--green); }
+  .bar-fill.amber { background: var(--amber); }
+  .bar-fill.blue { background: var(--blue); }
+
+  /* ── Executive Summary ── */
+  .exec-summary { background: var(--dark); color: white; border-radius: 12px; padding: 36px 40px; margin-bottom: 20px; }
+  .exec-summary h2 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; margin-bottom: 6px; color: white; }
+  .exec-summary .byline { font-size: 0.75rem; color: #888; margin-bottom: 24px; }
+  .exec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .exec-block h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--red-light); margin-bottom: 8px; }
+  .exec-block p { font-size: 0.82rem; color: #ccc; line-height: 1.65; }
+  .exec-block p + p { margin-top: 8px; }
+  .highlight-number { font-family: 'DM Serif Display', serif; font-size: 1.8rem; color: white; display: block; margin-bottom: 4px; }
+
+  /* ── AI Summary loading state ── */
+  .ai-loading {
+    display: flex; align-items: center; gap: 10px;
+    color: #888; font-size: 0.82rem; font-style: italic;
+    padding: 12px 0;
+  }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid #444;
+    border-top-color: var(--red-light);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Opportunity cards ── */
+  .opp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  .opp-card { background: var(--white); border-radius: 12px; border: 1px solid var(--border); padding: 22px; }
+  .opp-card h4 { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .opp-card .opp-num { font-family: 'DM Serif Display', serif; font-size: 2rem; color: var(--red); margin: 4px 0; }
+  .opp-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.55; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-red { background: var(--red); }
+  .dot-amber { background: var(--amber); }
+  .dot-blue { background: var(--blue); }
+
+  /* ── Footer ── */
+  footer { text-align: center; padding: 20px; font-size: 0.72rem; color: var(--muted); border-top: 1px solid var(--border); }
+
+  /* ── Divider ── */
+  .section-divider { display: flex; align-items: center; gap: 12px; margin: 32px 0 20px; }
+  .section-divider h2 { font-family: 'DM Serif Display', serif; font-size: 1.1rem; white-space: nowrap; }
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-icon">✦</div>
+    <div class="brand-text">
+      <h1>Student Medicover</h1>
+      <p>Lead Pipeline Intelligence Dashboard</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="header-meta">
+      <strong id="header-period">June 2024 – February 2025</strong><br>
+      CRM Data Analysis · <span id="header-count">401</span> Leads
+    </div>
+  </div>
+</header>
+
+<!-- Upload Zone -->
+<div id="upload-zone">
+  <label id="upload-label" for="csv-input">
+    ⬆ Upload New CSV
+  </label>
+  <input type="file" id="csv-input" accept=".csv">
+  <div id="upload-status">Showing default data (Jun 2024 – Feb 2025). Upload a new CSV to refresh all charts and AI insights.</div>
+  <div class="csv-hint">
+    <strong>Expected columns:</strong> Date, Status, Student Category, Group Chat (Yes/No), Sales Agent, Policy, Follow-up Count
+  </div>
+</div>
+
+<div class="wrapper">
+
+  <!-- Executive Summary -->
+  <div class="exec-summary">
+    <h2>Executive Summary</h2>
+    <p class="byline" id="exec-byline">Marketing & Business Development · Lead Pipeline Analysis</p>
+    <div id="exec-content">
+      <div class="exec-grid">
+        <div class="exec-block">
+          <h3>Pipeline Overview</h3>
+          <p id="exec-overview">The lead pipeline contains <strong style="color:white">401 total leads</strong> generated between June 2024 and February 2025, with a strong overall enrollment rate of <strong style="color:white">72.8%</strong> (292 enrolled). The pipeline peaked in September 2024 at 101 new leads, corresponding to the Fall semester intake season, with a secondary wave in July–August.</p>
+          <p>Graduate and OPT students convert at the highest rates (75.5% and 75.9%), while Undergraduate leads — the largest segment — trail at 68.6%.</p>
+        </div>
+        <div class="exec-block">
+          <h3>Critical Insight: Group Chat Effect</h3>
+          <span class="highlight-number" id="exec-group-highlight">90.1% vs 53.2%</span>
+          <p id="exec-group-text">The single most predictive factor in enrollment is whether a lead is added to a group chat. Leads in a group convert at <strong style="color:white">90.1%</strong>; those not in a group convert at only <strong style="color:white">53.2%</strong> — a 37-point gap.</p>
+        </div>
+        <div class="exec-block">
+          <h3>Key Opportunities</h3>
+          <p id="exec-opps"><strong style="color:#E74C3C">70 no-response leads</strong> averaging 5.2 follow-up attempts represent a 17.5% pipeline loss. <strong style="color:#E74C3C">188 leads never added to group chat</strong> — of which only 53.2% enrolled. Prioritizing group adoption for incoming leads is the highest-ROI tactical change available.</p>
+        </div>
+        <div class="exec-block">
+          <h3>Recommendations</h3>
+          <p id="exec-recs"><strong style="color:white">1. Mandate group chat onboarding</strong> as the first action after lead creation.<br><br>
+          <strong style="color:white">2. Re-engage expired & lost leads</strong> (16 total) before the Spring enrollment window closes.<br><br>
+          <strong style="color:white">3. Sub-Agent channel</strong> shows 100% enrollment on 18 leads — explore scaling this referral model.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Row -->
+  <p class="section-label">Key Metrics at a Glance</p>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Leads</div>
+      <div class="kpi-value" id="kpi-total">401</div>
+      <div class="kpi-sub" id="kpi-period">Jun 2024 – Feb 2025</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Enrolled</div>
+      <div class="kpi-value" id="kpi-enrolled">292</div>
+      <span class="kpi-badge badge-green" id="kpi-enroll-rate">72.8% rate</span>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Active Pipeline</div>
+      <div class="kpi-value" id="kpi-connecting">23</div>
+      <div class="kpi-sub">Currently Connecting</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">At Risk / Lost</div>
+      <div class="kpi-value" id="kpi-atrisk">86</div>
+      <div class="kpi-sub">No Response + Expired + Lost + Canceled</div>
+      <span class="kpi-badge badge-red">Recovery opportunity</span>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Avg Follow-ups to Enroll</div>
+      <div class="kpi-value" id="kpi-followup">1.6</div>
+      <div class="kpi-sub" id="kpi-followup-sub">vs 5.2 for No Response</div>
+    </div>
+  </div>
+
+  <!-- Pipeline Composition -->
+  <div class="section-divider"><h2>Pipeline Composition</h2><div class="divider-line"></div></div>
+  <div class="chart-grid-2">
+    <div class="card">
+      <div class="card-title">Lead Status Breakdown</div>
+      <div class="card-subtitle">Distribution of all leads by current status</div>
+      <div class="chart-container" style="height:220px;width:100%;"><canvas id="statusDonut" height="220"></canvas></div>
+      <div class="stat-rows" style="margin-top:14px" id="status-stat-rows">
+        <div class="stat-row"><span class="stat-row-label">🟢 Enrolled</span><div class="bar-bg"><div class="bar-fill green" style="width:72.8%"></div></div><span class="stat-row-val" id="sr-enrolled">292 (72.8%)</span></div>
+        <div class="stat-row"><span class="stat-row-label">🔴 No Response</span><div class="bar-bg"><div class="bar-fill" style="width:17.5%"></div></div><span class="stat-row-val" id="sr-noresponse">70 (17.5%)</span></div>
+        <div class="stat-row"><span class="stat-row-label">🟡 Connecting</span><div class="bar-bg"><div class="bar-fill amber" style="width:5.7%"></div></div><span class="stat-row-val" id="sr-connecting">23 (5.7%)</span></div>
+        <div class="stat-row"><span class="stat-row-label">⚫ Lost / Other</span><div class="bar-bg"><div class="bar-fill blue" style="width:4%"></div></div><span class="stat-row-val" id="sr-lost">16 (4.0%)</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Monthly Lead Volume</div>
+      <div class="card-subtitle">New leads created by month — peaks align with semester intake windows</div>
+      <div class="chart-container" style="height:280px;width:100%;"><canvas id="monthlyBar" height="280"></canvas></div>
+      <div class="insight-strip" id="insight-monthly"><strong>Peak insight:</strong> September 2024 generated 101 leads — 25% of annual volume in a single month. Plan resourcing accordingly.</div>
+    </div>
+  </div>
+
+  <!-- Conversion Drivers -->
+  <div class="section-divider"><h2>Conversion Drivers</h2><div class="divider-line"></div></div>
+  <div class="chart-grid-2">
+    <div class="card">
+      <div class="card-title">Enrollment Rate by Student Category</div>
+      <div class="card-subtitle">OPT students convert best; Undergraduate is largest but lowest-converting segment</div>
+      <div class="chart-container" style="height:240px;width:100%;"><canvas id="categoryBar" height="240"></canvas></div>
+      <div class="stat-rows" style="margin-top:14px" id="cat-stat-rows">
+        <div class="stat-row"><span class="stat-row-label">OPT (83 leads)</span><div class="bar-bg"><div class="bar-fill green" style="width:75.9%"></div></div><span class="stat-row-val">75.9%</span></div>
+        <div class="stat-row"><span class="stat-row-label">Graduate (139 leads)</span><div class="bar-bg"><div class="bar-fill green" style="width:75.5%"></div></div><span class="stat-row-val">75.5%</span></div>
+        <div class="stat-row"><span class="stat-row-label">J1 (39 leads)</span><div class="bar-bg"><div class="bar-fill amber" style="width:71.8%"></div></div><span class="stat-row-val">71.8%</span></div>
+        <div class="stat-row"><span class="stat-row-label">Undergraduate (140 leads)</span><div class="bar-bg"><div class="bar-fill" style="width:68.6%"></div></div><span class="stat-row-val">68.6%</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">The Group Chat Effect</div>
+      <div class="card-subtitle">Group chat membership is the single strongest predictor of enrollment</div>
+      <div class="chart-container" style="height:240px;width:100%;"><canvas id="groupChart" height="240"></canvas></div>
+      <div class="insight-strip" id="insight-group"><strong>37-point gap:</strong> Leads added to a group chat enroll at <strong>90.1%</strong>. Those never added convert at only <strong>53.2%</strong>.</div>
+    </div>
+  </div>
+
+  <!-- Sales Performance & Product Mix -->
+  <div class="section-divider"><h2>Sales Performance & Product Mix</h2><div class="divider-line"></div></div>
+  <div class="chart-grid-3">
+    <div class="card">
+      <div class="card-title">Sales Agent Performance</div>
+      <div class="card-subtitle">Enrolled vs not enrolled by agent</div>
+      <div class="chart-container" style="height:220px;width:100%;"><canvas id="agentChart" height="220"></canvas></div>
+      <div class="insight-strip" id="insight-agent"><strong>Sub-Agent: 100% rate.</strong> 18 leads, 18 enrolled. This referral channel warrants investigation and potential scaling.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Policy Distribution (Enrolled)</div>
+      <div class="card-subtitle">Plan selection among enrolled leads</div>
+      <div class="chart-container" style="height:200px;width:100%;"><canvas id="policyDonut" height="200"></canvas></div>
+      <div class="stat-rows" style="margin-top:10px" id="policy-stat-rows">
+        <div class="stat-row"><span class="stat-row-label">Prime 500</span><div class="bar-bg"><div class="bar-fill" style="width:55%"></div></div><span class="stat-row-val">55%</span></div>
+        <div class="stat-row"><span class="stat-row-label">Prime 100</span><div class="bar-bg"><div class="bar-fill blue" style="width:26%"></div></div><span class="stat-row-val">26%</span></div>
+        <div class="stat-row"><span class="stat-row-label">Supreme</span><div class="bar-bg"><div class="bar-fill amber" style="width:11%"></div></div><span class="stat-row-val">11%</span></div>
+        <div class="stat-row"><span class="stat-row-label">Elite + Other</span><div class="bar-bg"><div class="bar-fill green" style="width:9%"></div></div><span class="stat-row-val">9%</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Follow-Up Effectiveness</div>
+      <div class="card-subtitle">Average follow-up count by lead outcome</div>
+      <div class="chart-container" style="height:220px;width:100%;"><canvas id="followupChart" height="220"></canvas></div>
+      <div class="insight-strip" id="insight-followup"><strong>Enrolled leads close fast:</strong> Only 1.55 follow-ups on average. No-response leads absorb 5.23 — consider a 3-attempt cap then re-queue strategy.</div>
+    </div>
+  </div>
+
+  <!-- Action Opportunities -->
+  <div class="section-divider"><h2>Action Opportunities</h2><div class="divider-line"></div></div>
+  <div class="opp-grid" id="opp-grid">
+    <div class="opp-card">
+      <h4><span class="dot dot-red"></span>Group Chat Gap</h4>
+      <div class="opp-num" id="opp-groupchat">+88</div>
+      <p id="opp-groupchat-text">Leads never added to group chat that did not enroll. Retroactively adding even 50% of current "Connecting" leads to group chats could meaningfully lift conversion toward the 90% benchmark.</p>
+    </div>
+    <div class="opp-card">
+      <h4><span class="dot dot-amber"></span>No-Response Recovery</h4>
+      <div class="opp-num" id="opp-noresponse">70</div>
+      <p id="opp-noresponse-text">Leads classified as No Response after 4+ follow-ups. A channel-switch campaign timed around next semester's enrollment deadline could recover 15–20% of these leads.</p>
+    </div>
+    <div class="opp-card">
+      <h4><span class="dot dot-blue"></span>Expired & Lost Re-engagement</h4>
+      <div class="opp-num" id="opp-expired">16</div>
+      <p id="opp-expired-text">Expired, lost, and canceled leads. Expired leads had prior coverage and are most likely to re-enroll — a targeted outreach before the next renewal window is a quick win.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Student Medicover · Lead Pipeline Dashboard · <span id="footer-note">Data period: June 2024 – February 2025 · 401 leads analyzed</span>
+</footer>
+
+<script>
+const RED = '#C0392B', RED_L = '#E74C3C', GREEN = '#27AE60', AMBER = '#E67E22', BLUE = '#2980B9', PURPLE = '#8E44AD', DARK = '#1A1A1A';
+
+// ── Chart instances (so we can destroy & redraw) ──
+let charts = {};
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+}
+
+// ── Default hardcoded data ──
+const DEFAULT = {
+  total: 401,
+  period: 'Jun 2024 – Feb 2025',
+  statusCounts: { Enrolled: 292, 'No Response': 70, Connecting: 23, Lost: 10, Expired: 5, Canceled: 1 },
+  monthly: { labels: ['Jun 2024','Jul 2024','Aug 2024','Sep 2024','Oct 2024','Nov 2024','Dec 2024','Jan 2025','Feb 2025'], data: [16,78,79,101,27,52,25,14,9] },
+  categories: { OPT: { enrolled: 63, total: 83 }, Graduate: { enrolled: 105, total: 139 }, J1: { enrolled: 28, total: 39 }, Undergraduate: { enrolled: 96, total: 140 } },
+  groupChat: { inGroup: { enrolled: 192, notEnrolled: 21 }, notInGroup: { enrolled: 100, notEnrolled: 88 } },
+  agents: { 'Sales 1': { enrolled: 83, notEnrolled: 47 }, 'Sales 2': { enrolled: 77, notEnrolled: 44 }, 'Sub-Agent': { enrolled: 18, notEnrolled: 0 } },
+  policies: { 'Prime 500': 160, 'Prime 100': 75, Supreme: 31, Elite: 19, 'Global Care+': 6, Basic: 1 },
+  followups: { Enrolled: 1.55, Connecting: 2.52, Canceled: 3.0, Expired: 3.2, Lost: 3.7, 'No Response': 5.23 }
+};
+
+function renderCharts(d) {
+  destroyCharts();
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+  Chart.defaults.color = '#555';
+
+  const total = d.total;
+  const statusVals = Object.values(d.statusCounts);
+  const statusLabels = Object.keys(d.statusCounts);
+
+  // 1. Status donut
+  charts.status = new Chart(document.getElementById('statusDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: statusLabels,
+      datasets: [{ data: statusVals, backgroundColor: [GREEN, RED, AMBER, DARK, BLUE, PURPLE], borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} (${((ctx.raw/total)*100).toFixed(1)}%)` } } } }
+  });
+
+  // 2. Monthly bar
+  charts.monthly = new Chart(document.getElementById('monthlyBar'), {
+    type: 'bar',
+    data: {
+      labels: d.monthly.labels,
+      datasets: [{ label: 'New Leads', data: d.monthly.data, backgroundColor: ctx => { const v = ctx.raw; return v >= 100 ? RED : v >= 70 ? RED_L+'cc' : RED_L+'66'; }, borderRadius: 5, borderSkipped: false }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw} new leads` } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#F0F0F0' }, ticks: { stepSize: 25 } } } }
+  });
+
+  // 3. Category bar
+  const catLabels = Object.keys(d.categories).map(k => `${k}\n(${d.categories[k].total})`);
+  const catEnrolled = Object.values(d.categories).map(v => v.enrolled);
+  const catNot = Object.values(d.categories).map(v => v.total - v.enrolled);
+  charts.category = new Chart(document.getElementById('categoryBar'), {
+    type: 'bar',
+    data: { labels: catLabels, datasets: [{ label: 'Enrolled', data: catEnrolled, backgroundColor: GREEN, borderRadius: 4, borderSkipped: false }, { label: 'Not Enrolled', data: catNot, backgroundColor: '#E8E8E8', borderRadius: 4, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: '#F0F0F0' } } } }
+  });
+
+  // 4. Group chat
+  const gc = d.groupChat;
+  charts.group = new Chart(document.getElementById('groupChart'), {
+    type: 'bar',
+    data: { labels: ['In Group Chat', 'Not in Group Chat'], datasets: [{ label: 'Enrolled', data: [gc.inGroup.enrolled, gc.notInGroup.enrolled], backgroundColor: GREEN, borderRadius: 4, borderSkipped: false }, { label: 'Not Enrolled', data: [gc.inGroup.notEnrolled, gc.notInGroup.notEnrolled], backgroundColor: RED, borderRadius: 4, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#F0F0F0' } } } }
+  });
+
+  // 5. Agent
+  const agentLabels = Object.keys(d.agents);
+  charts.agent = new Chart(document.getElementById('agentChart'), {
+    type: 'bar',
+    data: { labels: agentLabels, datasets: [{ label: 'Enrolled', data: agentLabels.map(k => d.agents[k].enrolled), backgroundColor: GREEN, borderRadius: 4, borderSkipped: false }, { label: 'Not Enrolled', data: agentLabels.map(k => d.agents[k].notEnrolled), backgroundColor: RED, borderRadius: 4, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#F0F0F0' } } } }
+  });
+
+  // 6. Policy donut
+  const policyLabels = Object.keys(d.policies);
+  const policyVals = Object.values(d.policies);
+  const enrolledTotal = d.statusCounts.Enrolled || 1;
+  charts.policy = new Chart(document.getElementById('policyDonut'), {
+    type: 'doughnut',
+    data: { labels: policyLabels, datasets: [{ data: policyVals, backgroundColor: [RED, BLUE, AMBER, GREEN, PURPLE, DARK], borderWidth: 2, borderColor: '#fff' }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} (${((ctx.raw/enrolledTotal)*100).toFixed(0)}%)` } } } }
+  });
+
+  // 7. Follow-up
+  const fuLabels = Object.keys(d.followups);
+  const fuVals = Object.values(d.followups);
+  const fuColors = fuLabels.map(l => ({ Enrolled: GREEN, Connecting: AMBER, Canceled: PURPLE, Expired: BLUE, Lost: DARK, 'No Response': RED }[l] || DARK));
+  charts.followup = new Chart(document.getElementById('followupChart'), {
+    type: 'bar',
+    data: { labels: fuLabels, datasets: [{ label: 'Avg Follow-ups', data: fuVals, backgroundColor: fuColors, borderRadius: 4, borderSkipped: false }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#F0F0F0' }, max: Math.ceil(Math.max(...fuVals) * 1.15) }, y: { grid: { display: false } } } }
+  });
+}
+
+function updateKPIs(d) {
+  const total = d.total;
+  const enrolled = d.statusCounts.Enrolled || 0;
+  const connecting = d.statusCounts.Connecting || 0;
+  const noResponse = d.statusCounts['No Response'] || 0;
+  const lost = (d.statusCounts.Lost || 0) + (d.statusCounts.Expired || 0) + (d.statusCounts.Canceled || 0);
+  const atRisk = noResponse + lost;
+  const fuEnrolled = d.followups.Enrolled || 0;
+  const fuNoResp = d.followups['No Response'] || 0;
+  const gc = d.groupChat;
+  const inGroupRate = gc.inGroup.enrolled / (gc.inGroup.enrolled + gc.inGroup.notEnrolled) * 100;
+  const notGroupRate = gc.notInGroup.enrolled / (gc.notInGroup.enrolled + gc.notInGroup.notEnrolled) * 100;
+
+  document.getElementById('kpi-total').textContent = total;
+  document.getElementById('kpi-period').textContent = d.period;
+  document.getElementById('kpi-enrolled').textContent = enrolled;
+  document.getElementById('kpi-enroll-rate').textContent = `${(enrolled/total*100).toFixed(1)}% rate`;
+  document.getElementById('kpi-connecting').textContent = connecting;
+  document.getElementById('kpi-atrisk').textContent = atRisk;
+  document.getElementById('kpi-followup').textContent = fuEnrolled.toFixed(1);
+  document.getElementById('kpi-followup-sub').textContent = `vs ${fuNoResp.toFixed(1)} for No Response`;
+  document.getElementById('header-count').textContent = total;
+  document.getElementById('header-period').textContent = d.period;
+  document.getElementById('footer-note').textContent = `Data period: ${d.period} · ${total} leads analyzed`;
+
+  // Status stat rows
+  document.getElementById('sr-enrolled').textContent = `${enrolled} (${(enrolled/total*100).toFixed(1)}%)`;
+  document.getElementById('sr-noresponse').textContent = `${noResponse} (${(noResponse/total*100).toFixed(1)}%)`;
+  document.getElementById('sr-connecting').textContent = `${connecting} (${(connecting/total*100).toFixed(1)}%)`;
+  document.getElementById('sr-lost').textContent = `${lost} (${(lost/total*100).toFixed(1)}%)`;
+
+  // Opp numbers
+  document.getElementById('opp-groupchat').textContent = `+${gc.notInGroup.notEnrolled}`;
+  document.getElementById('opp-noresponse').textContent = noResponse;
+  document.getElementById('opp-expired').textContent = (d.statusCounts.Expired||0) + (d.statusCounts.Lost||0) + (d.statusCounts.Canceled||0);
+
+  // Group highlight
+  document.getElementById('exec-group-highlight').textContent = `${inGroupRate.toFixed(1)}% vs ${notGroupRate.toFixed(1)}%`;
+}
+
+// ── Claude API: generate insights ──
+async function generateAIInsights(d) {
+  const total = d.total;
+  const enrolled = d.statusCounts.Enrolled || 0;
+  const noResponse = d.statusCounts['No Response'] || 0;
+  const gc = d.groupChat;
+  const inGroupRate = (gc.inGroup.enrolled / (gc.inGroup.enrolled + gc.inGroup.notEnrolled) * 100).toFixed(1);
+  const notGroupRate = (gc.notInGroup.enrolled / (gc.notInGroup.enrolled + gc.notInGroup.notEnrolled) * 100).toFixed(1);
+  const topCat = Object.entries(d.categories).sort((a,b)=>(b[1].enrolled/b[1].total)-(a[1].enrolled/a[1].total))[0];
+  const bottomCat = Object.entries(d.categories).sort((a,b)=>(a[1].enrolled/a[1].total)-(b[1].enrolled/b[1].total))[0];
+  const topAgent = Object.entries(d.agents).sort((a,b)=>(b[1].enrolled/(b[1].enrolled+b[1].notEnrolled))-(a[1].enrolled/(a[1].enrolled+a[1].notEnrolled)))[0];
+  const topPolicy = Object.entries(d.policies).sort((a,b)=>b[1]-a[1])[0];
+  const peakMonth = d.monthly.labels[d.monthly.data.indexOf(Math.max(...d.monthly.data))];
+
+  const statsPrompt = `You are a CRM analyst for Student Medicover, a health insurance company serving international students in the US. Analyze this lead pipeline data and write CONCISE insight text for each section of a dashboard. Use plain text only — no markdown, no asterisks, no bullet points. Be direct and data-specific.
+
+DATA SNAPSHOT:
+- Period: ${d.period}
+- Total leads: ${total}, Enrolled: ${enrolled} (${(enrolled/total*100).toFixed(1)}%)
+- No Response: ${noResponse} (${(noResponse/total*100).toFixed(1)}%)
+- Connecting: ${d.statusCounts.Connecting || 0}
+- Group chat in-group rate: ${inGroupRate}%, not-in-group rate: ${notGroupRate}%
+- Top converting category: ${topCat[0]} at ${(topCat[1].enrolled/topCat[1].total*100).toFixed(1)}%
+- Lowest converting category: ${bottomCat[0]} at ${(bottomCat[1].enrolled/bottomCat[1].total*100).toFixed(1)}%
+- Top performing agent: ${topAgent[0]} at ${(topAgent[1].enrolled/(topAgent[1].enrolled+topAgent[1].notEnrolled)*100).toFixed(1)}%
+- Most popular policy: ${topPolicy[0]} (${topPolicy[1]} enrolled)
+- Peak lead acquisition month: ${peakMonth} (${Math.max(...d.monthly.data)} leads)
+- Avg follow-ups to enroll: ${d.followups.Enrolled?.toFixed(2)}, vs ${d.followups['No Response']?.toFixed(2)} for No Response
+
+Respond ONLY with a valid JSON object with these exact keys:
+{
+  "execOverview": "2-3 sentence pipeline overview paragraph. No line breaks.",
+  "execGroupText": "1-2 sentences about the group chat conversion gap. Mention both percentages.",
+  "execOpps": "2-3 sentences about the top 2 improvement opportunities.",
+  "execRecs": "3 numbered recommendations as a single plain text string, separated by double line breaks (\\n\\n). Each starts with a number and period.",
+  "insightMonthly": "1-2 sentences about seasonal patterns and resourcing implications.",
+  "insightGroup": "1-2 sentences about the group chat finding.",
+  "insightAgent": "1-2 sentences about agent performance standouts.",
+  "insightFollowup": "1-2 sentences about follow-up efficiency and recommended cap.",
+  "oppGroupchatText": "2-3 sentences on the group chat gap opportunity and quick win.",
+  "oppNoresponseText": "2-3 sentences on recovering no-response leads.",
+  "oppExpiredText": "2-3 sentences on expired/lost re-engagement."
+}`;
+
+  // Set all insight strips to loading
+  const insightIds = ['insight-monthly','insight-group','insight-agent','insight-followup'];
+  insightIds.forEach(id => {
+    const el = document.getElementById(id);
+    el.className = 'insight-strip loading';
+    el.innerHTML = '<div class="ai-loading"><div class="spinner"></div>Generating AI insight…</div>';
+  });
+
+  // Set exec to loading
+  document.getElementById('exec-content').innerHTML = `
+    <div style="color:#888;font-size:0.85rem;display:flex;align-items:center;gap:12px;padding:16px 0;">
+      <div class="spinner" style="border-color:#444;border-top-color:#E74C3C;width:20px;height:20px;border-width:3px;"></div>
+      Claude is analyzing the new data and rewriting insights…
+    </div>`;
+
+  try {
+    const response = await fetch("/.netlify/functions/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: statsPrompt }]
+      })
+    });
+
+    const result = await response.json();
+    const text = result.content?.map(b => b.text || '').join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const ai = JSON.parse(clean);
+
+    // Restore exec grid
+    document.getElementById('exec-content').innerHTML = `
+      <div class="exec-grid">
+        <div class="exec-block"><h3>Pipeline Overview</h3><p id="exec-overview"></p></div>
+        <div class="exec-block">
+          <h3>Critical Insight: Group Chat Effect</h3>
+          <span class="highlight-number" id="exec-group-highlight">${inGroupRate}% vs ${notGroupRate}%</span>
+          <p id="exec-group-text"></p>
+        </div>
+        <div class="exec-block"><h3>Key Opportunities</h3><p id="exec-opps"></p></div>
+        <div class="exec-block"><h3>Recommendations</h3><p id="exec-recs"></p></div>
+      </div>`;
+
+    document.getElementById('exec-overview').textContent = ai.execOverview;
+    document.getElementById('exec-group-text').innerHTML = ai.execGroupText.replace(inGroupRate+'%', `<strong style="color:white">${inGroupRate}%</strong>`).replace(notGroupRate+'%', `<strong style="color:white">${notGroupRate}%</strong>`);
+    document.getElementById('exec-opps').innerHTML = ai.execOpps;
+    document.getElementById('exec-recs').innerHTML = ai.execRecs.split('\n\n').map((r,i) => {
+      const parts = r.split(/^\d+\.\s*/);
+      const content = parts.length > 1 ? parts[1] : r;
+      const num = i+1;
+      return `<strong style="color:white">${num}. ${content.split(' ')[0]}</strong> ${content.split(' ').slice(1).join(' ')}`;
+    }).join('<br><br>');
+
+    // Restore insight strips
+    const setInsight = (id, text, isAI = true) => {
+      const el = document.getElementById(id);
+      el.className = 'insight-strip' + (isAI ? ' ai' : '');
+      el.innerHTML = `<strong>AI Insight:</strong> ${text}`;
+    };
+    setInsight('insight-monthly', ai.insightMonthly);
+    setInsight('insight-group', ai.insightGroup);
+    setInsight('insight-agent', ai.insightAgent);
+    setInsight('insight-followup', ai.insightFollowup);
+
+    document.getElementById('opp-groupchat-text').textContent = ai.oppGroupchatText;
+    document.getElementById('opp-noresponse-text').textContent = ai.oppNoresponseText;
+    document.getElementById('opp-expired-text').textContent = ai.oppExpiredText;
+
+  } catch (err) {
+    console.error('Claude API error:', err);
+    insightIds.forEach(id => {
+      const el = document.getElementById(id);
+      el.className = 'insight-strip';
+      el.innerHTML = `<strong>Note:</strong> AI insights unavailable. Check console for details.`;
+    });
+    // Restore exec with static content
+    document.getElementById('exec-content').innerHTML = `<p style="color:#aaa;font-size:0.82rem;">AI summary unavailable — check API connection.</p>`;
+  }
+}
+
+// ── CSV Parser ──
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,'').toLowerCase());
+  const rows = lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.trim().replace(/"/g,''));
+    const obj = {};
+    headers.forEach((h,i) => obj[h] = vals[i] || '');
+    return obj;
+  }).filter(r => Object.values(r).some(v => v));
+
+  // Detect columns flexibly
+  const col = (candidates) => headers.find(h => candidates.some(c => h.includes(c))) || candidates[0];
+  const statusCol = col(['status']);
+  const dateCol = col(['date','created','time']);
+  const catCol = col(['category','type','student']);
+  const groupCol = col(['group','chat','wechat']);
+  const agentCol = col(['agent','sales','rep','assigned']);
+  const policyCol = col(['policy','plan','product']);
+  const followupCol = col(['follow','touchpoint','contact','attempt']);
+
+  const total = rows.length;
+
+  // Status counts
+  const statusCounts = {};
+  rows.forEach(r => {
+    const s = r[statusCol] || 'Unknown';
+    const key = normalizeStatus(s);
+    statusCounts[key] = (statusCounts[key] || 0) + 1;
+  });
+
+  // Monthly
+  const monthMap = {};
+  rows.forEach(r => {
+    const raw = r[dateCol] || '';
+    const d = new Date(raw);
+    if (isNaN(d)) return;
+    const key = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+    monthMap[key] = (monthMap[key] || 0) + 1;
+  });
+  const sortedMonths = Object.keys(monthMap).sort((a,b) => new Date(a) - new Date(b));
+
+  // Period
+  const period = sortedMonths.length >= 2
+    ? `${sortedMonths[0]} – ${sortedMonths[sortedMonths.length-1]}`
+    : (sortedMonths[0] || 'Unknown period');
+
+  // Categories
+  const categories = {};
+  rows.forEach(r => {
+    const cat = r[catCol] || 'Other';
+    if (!categories[cat]) categories[cat] = { enrolled: 0, total: 0 };
+    categories[cat].total++;
+    if (isEnrolled(r[statusCol])) categories[cat].enrolled++;
+  });
+
+  // Group chat
+  const groupChat = { inGroup: { enrolled: 0, notEnrolled: 0 }, notInGroup: { enrolled: 0, notEnrolled: 0 } };
+  rows.forEach(r => {
+    const inG = (r[groupCol] || '').toLowerCase().includes('yes') || (r[groupCol] || '').toLowerCase().includes('true') || (r[groupCol] || '') === '1';
+    const bucket = inG ? 'inGroup' : 'notInGroup';
+    if (isEnrolled(r[statusCol])) groupChat[bucket].enrolled++;
+    else groupChat[bucket].notEnrolled++;
+  });
+
+  // Agents
+  const agents = {};
+  rows.forEach(r => {
+    const agent = r[agentCol] || 'Unassigned';
+    if (!agents[agent]) agents[agent] = { enrolled: 0, notEnrolled: 0 };
+    if (isEnrolled(r[statusCol])) agents[agent].enrolled++;
+    else agents[agent].notEnrolled++;
+  });
+
+  // Policies
+  const policies = {};
+  rows.filter(r => isEnrolled(r[statusCol])).forEach(r => {
+    const p = r[policyCol] || 'Unknown';
+    policies[p] = (policies[p] || 0) + 1;
+  });
+
+  // Follow-ups by status
+  const fuGroups = {};
+  rows.forEach(r => {
+    const s = normalizeStatus(r[statusCol] || 'Unknown');
+    const fu = parseFloat(r[followupCol]) || 0;
+    if (!fuGroups[s]) fuGroups[s] = [];
+    fuGroups[s].push(fu);
+  });
+  const followups = {};
+  Object.entries(fuGroups).forEach(([k,arr]) => {
+    followups[k] = arr.reduce((a,b) => a+b, 0) / arr.length;
+  });
+
+  return { total, period, statusCounts, monthly: { labels: sortedMonths, data: sortedMonths.map(m => monthMap[m]) }, categories, groupChat, agents, policies, followups };
+}
+
+function normalizeStatus(s) {
+  const l = (s||'').toLowerCase();
+  if (l.includes('enroll')) return 'Enrolled';
+  if (l.includes('no response') || l.includes('noresponse') || l.includes('no_response')) return 'No Response';
+  if (l.includes('connect') || l.includes('in progress') || l.includes('active')) return 'Connecting';
+  if (l.includes('lost') || l.includes('decline') || l.includes('reject')) return 'Lost';
+  if (l.includes('expire') || l.includes('lapse')) return 'Expired';
+  if (l.includes('cancel')) return 'Canceled';
+  return s;
+}
+
+function isEnrolled(s) { return (s||'').toLowerCase().includes('enroll'); }
+
+// ── Main render ──
+function renderAll(d) {
+  updateKPIs(d);
+  renderCharts(d);
+  generateAIInsights(d);
+}
+
+// ── File upload handler ──
+document.getElementById('csv-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('upload-status');
+  status.textContent = `Reading ${file.name}…`;
+  status.className = '';
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const d = parseCSV(ev.target.result);
+      if (d.total === 0) throw new Error('No valid rows found.');
+      status.className = 'success';
+      status.textContent = `✓ ${file.name} loaded — ${d.total} leads · ${d.period}. Regenerating AI insights…`;
+      renderAll(d);
+    } catch(err) {
+      status.className = 'error';
+      status.textContent = `✗ Error parsing CSV: ${err.message}. Check column names match expected format.`;
+    }
+  };
+  reader.readAsText(file);
+  this.value = '';
+});
+
+// ── Initial render with default data ──
+window.addEventListener('load', () => renderAll(DEFAULT));
+</script>
+</body>
+</html>
